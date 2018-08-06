@@ -1,0 +1,343 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>CMPD Demo App - Leo Montero</title>
+
+    <script>dojoConfig = { parseOnLoad: true, isDebug: true }</script>
+
+    <link rel="stylesheet" href="https://js.arcgis.com/3.22/dijit/themes/claro/claro.css">
+    <link rel="stylesheet" href="https://js.arcgis.com/3.22/dojox/layout/resources/FloatingPane.css" />
+    <link rel="stylesheet" href="https://js.arcgis.com/3.22/esri/css/esri.css">
+    <script src="https://js.arcgis.com/3.22/"></script>
+    
+    <style>
+
+      html, body, #map {
+        height: 100%; width: 100%; margin: 0; padding: 0;
+      }
+
+      .appHeader {
+        background-color: #078673;
+        font-family: sans-serif;
+        height: 70px;
+        margin: 0;
+        padding: 0;
+        width: 100%;
+      }
+
+      .appHeader .headerLogo {
+        float: left;
+        left: 30px;
+        position: relative;
+        top: 8px;
+      }        
+
+      .appHeader .headerTitle {
+        color: #FFFFFF;
+        float: left;
+        font-size: 16pt;
+        font-weight: bold;
+        left: 60px;
+        top: 15px;
+        position: relative;
+      }
+
+      .appHeader .subHeaderTitle {
+        color: #CFCFCF;
+        font-size: small;
+      }      
+
+      .appHeader .headerButtons {
+        float: right;
+        right: 30px;
+        position: relative;
+        top: 20px;
+      }        
+
+      #basemapFloatingPane {
+        -moz-border-radius: 6px;
+        -webkit-border-radius: 6px;
+        position: absolute;
+        overflow: auto;
+        top: 100px;
+        right: 50px;
+        width: 480px;
+        height: 370px;
+        z-index: 90;
+      }
+
+      #layerlistFloatingPane {
+        -moz-border-radius: 6px;
+        -webkit-border-radius: 6px;
+        position: absolute;
+        overflow: auto;
+        bottom: 50px;
+        right: 50px;
+        width: 250px;
+        height: 140px;
+        z-index: 90;
+      }
+
+      .dojoxFloatingPaneContent {
+        font-family: sans-serif;
+        font-size: 8pt;
+        font-weight: bold;
+        overflow: auto;
+      }
+
+      .dojoxFloatingPaneTitle {
+        color: white;
+        background-color: #078673;
+        font-family: sans-serif;
+        font-size: 12pt;
+        font-weight: bold;
+        overflow: auto;
+      }
+
+      .claro .dijitContentPane {
+        font-family: sans-serif; 
+        font-weight: normal;
+      }
+
+      .claro .dojoxDock{
+        font-family: sans-serif; 
+        font-size: x-small;
+      }
+
+      .claro .dojoxDockTitleNode {
+        vertical-align: -webkit-baseline-middle;
+      }
+
+      .claro .dijitReset {
+        font-family: sans-serif; 
+        font-size: x-small;
+      }  
+
+
+    </style>
+
+    <script>
+
+      var map;
+      var basemapGallery;
+      var listOfLayers;
+
+      var policeStationsFeatureLayer;
+      var trafficCamsFeatureLayer
+
+      var policeStationsURL = "https://sampleserver1.arcgisonline.com/ArcGIS/rest/services/Louisville/LOJIC_PublicSafety_Louisville/MapServer/3";
+      var trafficCamerasURL = "https://sampleserver1.arcgisonline.com/ArcGIS/rest/services/Louisville/LOJIC_PublicSafety_Louisville/MapServer/2"; 
+
+      require(
+
+        [ 
+
+          "dijit/registry", 
+
+          "dojo/ready",
+
+          "esri/arcgis/utils",
+
+          "esri/config",
+
+          "esri/dijit/BasemapGallery",
+          "esri/dijit/LayerList",
+          "esri/dijit/PopupTemplate",
+
+          "esri/layers/FeatureLayer",
+
+          "esri/map", 
+
+          "dojox/layout/FloatingPane",
+
+          "dojo/domReady!" 
+
+        ],
+
+        function( 
+
+          registry,          
+
+          ready,
+
+          arcgisUtils,
+
+          esriConfig,
+
+          BasemapGallery,
+          LayerList,
+          PopupTemplate,
+
+          FeatureLayer,
+
+          Map, 
+
+          FloatingPane
+
+        ) { 
+
+          ready(function () {
+
+            esriConfig.defaults.io.corsDetection = false;
+
+            basemapFloatingPane = registry.byId("basemapFloatingPane");
+            layerlistFloatingPane = registry.byId("layerlistFloatingPane");
+
+
+            map = new Map("map", {
+              basemap: "topo",
+              center: [-85.73, 38.25],
+              zoom: 11
+            });
+
+
+            var psInfoTemplate = new PopupTemplate({
+              title: "Police Station",
+              description: "</p><b>Name: </b>{PD_NAME}</p><b>Address: </b>{ADDRESS}",
+            });
+
+            var psFeatureLayerOptions = {
+              id: "Police Stations", 
+              visible: false,
+              infoTemplate: psInfoTemplate,
+              outFields: ["PD_NAME", "ADDRESS"]
+            };
+
+            policeStationsFeatureLayer = new FeatureLayer(policeStationsURL, psFeatureLayerOptions);
+
+
+            var tcInfoTemplate = new PopupTemplate({
+              title: "Traffic Camera",
+              description: "</p><b>Location: </b>{DESCRIPTION}</p><b>Status: </b>{ONLINE:formatOnlineString}",
+            });
+
+            formatOnlineString = function (value, key, data) {
+
+              var result = "";
+
+              switch (value) {
+
+                case "Y":
+                  result = "Online";
+                  break;
+
+                default:
+                  result = "Unknown";     
+
+              }
+
+              return result;
+
+            };
+
+            var tcFeatureLayerOptions = {
+              id: "Traffic Cameras", 
+              visible: false,
+              infoTemplate: tcInfoTemplate,
+              outFields: ["ONLINE", "DESCRIPTION"]
+            };
+
+            trafficCamsFeatureLayer = new FeatureLayer(trafficCamerasURL, tcFeatureLayerOptions);
+
+
+            map.addLayer(policeStationsFeatureLayer);
+            map.addLayer(trafficCamsFeatureLayer);
+
+
+            basemapGallery = new BasemapGallery({
+              showArcGISBasemaps: true,
+              map: map
+            }, "basemapGallery");
+            basemapGallery.startup();
+            
+            basemapGallery.on("error", function(msg) {
+              console.log("Basemap gallery error:  ", msg);
+            });
+
+
+            listOfLayers = new LayerList({
+               map: map,
+               layers:  [ policeStationsFeatureLayer, trafficCamsFeatureLayer ], 
+            },"layerList");
+            listOfLayers.startup();       
+
+            listOfLayers.on("error", function(msg) {
+              console.log("Layerlist error:  ", msg);
+            });
+
+
+          })
+
+
+        }
+
+      );     
+
+
+      function showBasemapFloatingPane() {  
+        basemapFloatingPane.show();
+      }  
+
+
+      function showLayerlistFloatingPane() {  
+        layerlistFloatingPane.show();
+      }  
+
+
+    </script>
+  </head>
+  <body class="claro">
+
+    <div class="appHeader">
+      <div class="headerLogo">
+        <img src="images/headerImage.png" height="54">
+      </div>
+      <div class="headerTitle">
+        <span id="headerTitleSpan">CMPD Demo App</span>
+        <div id="subHeaderTitleSpan" class="subHeaderTitle">Leo Montero - August 2018</div>
+      </div>
+      <div class="headerButtons">
+        <img  src="images/basemap.png" 
+              height="32" 
+              alt="Change Basemap" 
+              title="Change Basemap"
+              onclick="showBasemapFloatingPane();">
+        <img  src="images/layers.png" 
+              height="32" 
+              alt="Turn Layers On/Off" 
+              title="Turn Layers On/Off"
+              onclick="showLayerlistFloatingPane();">
+      </div>
+    </div>
+
+    <div id="map"></div>
+
+    <div id="basemapFloatingPane" data-dojo-type="dojox.layout.FloatingPane"
+          data-dojo-props="title:'Change Basemap', closable:false, resizable:false, dockable:true",
+          style="visibility:hidden;"> 
+      <br>
+      <div>
+        <span style="padding:5px 5px;">Click on any of the following options to change the Basemap.</span>    
+      </div>
+      <br>
+      <div id="basemapGallery"></div>
+    </div>
+
+    <div id="layerlistFloatingPane" data-dojo-type="dojox.layout.FloatingPane"
+          data-dojo-props="title:'Turn Layers On/Off', closable:false, resizable:false, dockable:true",
+          style="visibility:hidden;"> 
+      <br>
+      <div>
+        <span style="padding:5px 5px;">Use the checkboxes to turn Layers On/Off.</span>    
+      </div>
+      <div>
+        <span style="padding:5px 5px;">Click on any element to get additional information.</span>    
+      </div>      
+      <br>
+      <div id="layerList"></div>
+    </div>
+
+  </body>
+</html>
